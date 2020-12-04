@@ -3,28 +3,26 @@
 const line = require('@line/bot-sdk');
 const express = require('express');
 const config = require('./config.json');
-
-var mysql = require('mysql');
+const mysql = require('mysql');
 
 var con = mysql.createConnection({
-  host: "localhost",
-  user: "peach",
-  password: "yourpassword",
-  database: "mydb"
+  host: config.host,
+  user: config.user,
+  password: config.password,
+  database: config.database
 });
 
 con.connect(function (err) {
   if (err) throw err;
-  con.query("SELECT * FROM customers", function (err, result, fields) {
-    if (err) throw err;
-    console.log(result);
-  });
 });
 
 // create LINE SDK client
 const client = new line.Client(config);
 
 const app = express();
+
+const peach = 'U476e9b43e847f9cb0610c6be07b7bda7';
+const aoi = 'U91ed37b6b3c80629914ece2680ec4db5';
 
 // webhook callback
 app.post('/webhook', line.middleware(config), (req, res) => {
@@ -35,6 +33,14 @@ app.post('/webhook', line.middleware(config), (req, res) => {
   // handle events separately
   Promise.all(req.body.events.map(event => {
     console.log('event', event);
+
+    var dt = new Date(Date.now() + 25200000).toISOString().replace(/T/, ' ').replace(/\..+/, ''); // UTC +7
+    var sql = "insert into log (create_dt, detail) values ?";
+    var values = [[dt, JSON.stringify(event)]];
+    con.query(sql, [values], function (err, result) {
+      if (err) throw err;
+    });
+
     // check verify webhook event
     if (event.replyToken === '00000000000000000000000000000000' ||
       event.replyToken === 'ffffffffffffffffffffffffffffffff') {
@@ -58,6 +64,14 @@ const replyText = (token, texts) => {
   );
 };
 
+const pushText = (to, texts) => {
+  texts = Array.isArray(texts) ? texts : [texts];
+  return client.pushMessage(
+    to,
+    texts.map((text) => ({ type: 'text', text }))
+  );
+};
+
 // callback function to handle a single event
 function handleEvent(event) {
   switch (event.type) {
@@ -65,7 +79,7 @@ function handleEvent(event) {
       const message = event.message;
       switch (message.type) {
         case 'text':
-          return handleText(message, event.replyToken);
+          return handleText(message, event.replyToken, event);
         case 'image':
           return handleImage(message, event.replyToken);
         case 'video':
@@ -97,6 +111,11 @@ function handleEvent(event) {
       return replyText(event.replyToken, `Got postback: ${data}`);
 
     case 'beacon':
+      // Send Aoi
+      if (event.source.userId == peach) {
+        handleBeacon(event.replyToken, event);
+        return false;
+      }
       const dm = `${Buffer.from(event.beacon.dm || '', 'hex').toString('utf8')}`;
       return replyText(event.replyToken, `${event.beacon.type} beacon hwid : ${event.beacon.hwid} with device message = ${dm}`);
 
@@ -105,11 +124,16 @@ function handleEvent(event) {
   }
 }
 
-function handleText(message, replyToken) {
+function handleText(message, replyToken, event) {
   var text = message.text;
-  if(text === '!id') text = "This is a book";
+  if(text === '!id') text = event.source.userId;
 
   return replyText(replyToken, text);
+}
+
+function handleBeacon(replyToken, event) {
+  pushText(peach, 'Sent to aoi..');
+  return pushText(aoi, 'ถึงบ้านแล้วค้าบ');
 }
 
 function handleImage(message, replyToken) {
