@@ -4,6 +4,23 @@ const line = require('@line/bot-sdk');
 const express = require('express');
 const config = require('./config.json');
 
+var mysql = require('mysql');
+
+var con = mysql.createConnection({
+  host: "localhost",
+  user: "peach",
+  password: "yourpassword",
+  database: "mydb"
+});
+
+con.connect(function (err) {
+  if (err) throw err;
+  con.query("SELECT * FROM customers", function (err, result, fields) {
+    if (err) throw err;
+    console.log(result);
+  });
+});
+
 // create LINE SDK client
 const client = new line.Client(config);
 
@@ -89,7 +106,10 @@ function handleEvent(event) {
 }
 
 function handleText(message, replyToken) {
-  return replyText(replyToken, message.text);
+  var text = message.text;
+  if(text === '!id') text = "This is a book";
+
+  return replyText(replyToken, text);
 }
 
 function handleImage(message, replyToken) {
