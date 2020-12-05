@@ -126,7 +126,19 @@ function handleEvent(event) {
 
 function handleText(message, replyToken, event) {
   var text = message.text;
+  var userId = event.source.userId;
   if(text === '!id') text = event.source.userId;
+  else if(userId === peach) {
+    var pos = text.indexOf(' ');
+    if(pos !== -1) {
+      var cmd = text.slice(0, pos);
+      if(cmd === '!aoi') pushText(aoi, text.slice(pos+1));
+      else if(cmd === '!peach') pushText(peach, text.slice(pos+1));
+      else return replyText(replyToken, text);
+
+      return pushText(peach, 'Sent');
+    }
+  }
 
   return replyText(replyToken, text);
 }
