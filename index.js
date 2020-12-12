@@ -114,7 +114,6 @@ function handleEvent(event) {
       // Send Aoi
       if (event.source.userId == peach) {
         handleBeacon(event.replyToken, event);
-        return false;
       }
       const dm = `${Buffer.from(event.beacon.dm || '', 'hex').toString('utf8')}`;
       return replyText(event.replyToken, `${event.beacon.type} beacon hwid : ${event.beacon.hwid} with device message = ${dm}`);
@@ -144,7 +143,7 @@ function handleText(message, replyToken, event) {
 }
 
 function handleBeacon(replyToken, event) {
-  pushText(peach, 'Sent to aoi..');
+  pushText(peach, 'Sent beacon to aoi..');
   return pushText(aoi, 'ถึงบ้านแล้วค้าบ');
 }
 
