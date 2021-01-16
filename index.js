@@ -113,7 +113,7 @@ function handleEvent(event) {
     case 'beacon':
       // Send Aoi
       if (event.source.userId == peach) {
-        handleBeacon(event.replyToken, event);
+        sendAoi(event.replyToken, event);
       }
       const dm = `${Buffer.from(event.beacon.dm || '', 'hex').toString('utf8')}`;
       return replyText(event.replyToken, `${event.beacon.type} beacon hwid : ${event.beacon.hwid} with device message = ${dm}`);
@@ -142,9 +142,48 @@ function handleText(message, replyToken, event) {
   return replyText(replyToken, text);
 }
 
-function handleBeacon(replyToken, event) {
-  pushText(peach, 'Sent beacon to aoi..');
-  return pushText(aoi, 'ถึงบ้านแล้วค้าบ');
+function sendAoi(replyToken, event) {
+  // Check time enter 16:00 - 02:00
+  var time = event.timestamp;
+  var now = new Date(time);
+  var hour = date('h', time) * 1;
+  var date_start = hour < 2 ? date('', Date.now() - 86400000) : date(); // + 24 hours
+  var start = new Date(date_start + " 16:00:00");
+  var end = new Date(start.getTime() + 36000000); // + 10 hours
+
+  if (now > start && now < end) {
+    // Check sent status today
+    var sql = `select \
+                count(id) as count, \
+                json_value(detail, '$.beacon.type') as beacon_type\
+              from send_log\
+              where\
+                create_dt between '${date('now', start)}' and '${date('now', end)}' and\
+                user_id = '${peach}' and\
+                type = 'beacon'\
+              having \
+                beacon_type = 'enter'\
+              `;
+    con.query(sql, function (err, result) {
+      if (err) throw err;
+
+      var count = result[0] ? result[0].count * 1 : 0;
+      // Send if not sent yet
+      if(count === 0) {
+        pushText(peach, 'Sent beacon to aoi..');
+        pushText(aoi, 'ถึงบ้านแล้วค้าบ');
+
+        var userId = event.source.userId;
+        var type = event.type;
+        var dt = date('now', now);
+        var sql = "insert into send_log (create_dt, user_id, type, detail) values ?";
+        var values = [[dt, userId, type, JSON.stringify(event)]];
+        con.query(sql, [values], function (err, result) {
+          if (err) throw err;
+        });
+      }
+    });
+  }
 }
 
 function handleImage(message, replyToken) {
@@ -165,6 +204,31 @@ function handleLocation(message, replyToken) {
 
 function handleSticker(message, replyToken) {
   return replyText(replyToken, 'Got Sticker');
+}
+
+function date(format = '', set_date = '') {
+  var date = set_date ? new Date(set_date) : new Date();
+  if (isNaN(date.getTime())) return false;
+
+  function padStr(input, digit=2) {
+    return ('0' + input).slice(-digit);
+  }
+
+  var d = padStr(date.getDate()), m = padStr(date.getMonth() + 1), y = date.getFullYear();
+  var h = padStr(date.getHours()), i = padStr(date.getMinutes()), s = padStr(date.getSeconds());
+  var t = new Date(y, m, 0).getDate();
+  var str = ''
+
+  if (format === '') {
+    str = `${y}-${m}-${d}`;
+  } else if(format === 'now') {
+    str = `${y}-${m}-${d} ${h}:${i}:${s}`;
+  } else if(format === 'time') {
+    str = date.getTime();
+  } else {
+    str = format.replace('y', y).replace('m', m).replace('d', d).replace('h', h).replace('i', i).replace('s', s).replace('t', t);
+  }
+  return str;
 }
 
 const port = config.port;
